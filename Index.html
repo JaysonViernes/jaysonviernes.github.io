@@ -77,6 +77,15 @@ const StoryFlags = {
 };
 
 const StoryQueue = [];
+function resetStory(){
+  StoryFlags.introShown = false;
+  StoryFlags.firstRescue = false;
+  StoryFlags.faunaSeen = false;
+  StoryFlags.midpointShown = false;
+  StoryFlags.debriefShown = false;
+  StoryQueue.length = 0;
+  if(storyOverlay){ storyOverlay.classList.add('hidden'); }
+}
 let storyShowing = false;
 
 function queueStory(title, text){
@@ -355,7 +364,8 @@ function spawnAlligator(x, y) {
     // ===== End Background =====
 
     function setupGame(){
-      canvas.width  = gameContainer.clientWidth;
+        resetStory();
+canvas.width  = gameContainer.clientWidth;
       canvas.height = gameContainer.clientHeight;
       initBackground();
       // Ensure water exists before any drawing
@@ -738,9 +748,15 @@ function updateSpeed(){
     function gameLoop(){
       if(gameState!=='playing'){
         if(gameState==='gameOver'){ if(typeof score==='number') debriefStory(score); showGameOver(); }
-        return;
+        // Safety guard: if we're in 'story' but nothing to show, auto-start playing
+        if(gameState==='story' && StoryQueue.length===0){
+          gameState='playing';
+          // fall through to continue loop
+        } else {
+          return;
+        }
       }
-      ctx.clearRect(0,0,canvas.width,canvas.height);
+ctx.clearRect(0,0,canvas.width,canvas.height);
       drawParallaxBackground();
       updateSwimmer();
       updateWater();
