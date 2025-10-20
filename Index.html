@@ -7,6 +7,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
+  #story-overlay.hidden{ display:none; } .z-40{ z-index:40; }
+  :root, html, body, #game-container, canvas, #ui-container { filter: none !important; -webkit-filter: none !important; }
+
     body{
       font-family:'Press Start 2P',cursive;
       overflow:hidden;
@@ -27,6 +30,7 @@
 
     <!-- UI -->
     <div id="ui-container" class="absolute top-0 left-0 w-full p-2 sm:p-4 flex justify-between items-center text-white game-ui text-xs sm:text-sm md:text-base">
+    <canvas id="miniMap" width="180" height="120" class="absolute top-2 right-2 sm:top-4 sm:right-4 bg-black/40 rounded-md border border-white/40"></canvas>
       <div id="lives-display">LIVES: 5</div>
       <div id="score-display">SCORE: 0</div>
     </div>
@@ -43,11 +47,159 @@
         Start Game
       </button>
     </div>
-  </div>
+  
+    <!-- Story Overlay -->
+    <div id="story-overlay" class="absolute inset-0 bg-black/70 text-white flex flex-col items-center justify-center text-center hidden z-40">
+      <h2 id="story-title" class="text-2xl sm:text-3xl mb-2"></h2>
+      <p id="story-text" class="max-w-md text-sm sm:text-base mb-4 px-4"></p>
+      <button id="story-next" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+        Continue
+      </button>
+    </div>
+</div>
 
   <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+
+// ===== Story System =====
+const storyOverlay = document.getElementById('story-overlay');
+const storyTitle = document.getElementById('story-title');
+const storyText = document.getElementById('story-text');
+const storyNext = document.getElementById('story-next');
+
+const StoryFlags = {
+  introShown: false,
+  firstRescue: false,
+  faunaSeen: false,
+  midpointShown: false,
+  debriefShown: false,
+};
+
+const StoryQueue = [];
+let storyShowing = false;
+
+function queueStory(title, text){
+  StoryQueue.push({title, text});
+  if(!storyShowing){
+    showNextStory();
+  }
+}
+function showNextStory(){
+  if(StoryQueue.length === 0){
+    storyShowing = false;
+    storyOverlay.classList.add('hidden');
+    if(gameState === 'story'){
+      gameState = 'playing'; // resume gameplay after story
+      gameLoop();
+    }
+    return;
+  }
+  const s = StoryQueue.shift();
+  storyShowing = true;
+  storyOverlay.classList.remove('hidden');
+  storyTitle.textContent = s.title;
+  storyText.textContent = s.text;
+  if(gameState === 'playing'){
+    gameState = 'story';
+  }
+}
+storyNext.addEventListener('click', showNextStory);
+
+// Intro sequence
+function showIntro(){
+  if(StoryFlags.introShown) return;
+  StoryFlags.introShown = true;
+  queueStory("Mission Brief",
+    "Flood waters are rising across the city. Rescue as many people as you can. Avoid hazards—floating logs, live wires, and now… reptiles.");
+  queueStory("Controls",
+    "Stroke Up: click/tap/Space. Hold Down/S to dive. Float with the water. Watch the mini‑map on the top‑right.");
+}
+
+// Midpoint reminder
+function midpointStory(){
+  if(StoryFlags.midpointShown) return;
+  StoryFlags.midpointShown = true;
+  queueStory("Mid‑Mission Update", "Great progress. New victims are appearing deeper underwater. Conserve stamina and time your dives.");
+}
+
+// Fauna warning
+function faunaWarning(){
+  if(StoryFlags.faunaSeen) return;
+  StoryFlags.faunaSeen = true;
+  queueStory("Heads Up!", "Crocodiles and alligators have been sighted in the flood! Keep your distance—they are fast and unpredictable.");
+}
+
+// Debrief (shown on game over once)
+function debriefStory(scoreVal){
+  if(StoryFlags.debriefShown) return;
+  StoryFlags.debriefShown = true;
+  queueStory("Debrief",
+    "Mission complete. You earned " + scoreVal + " points. Each rescue matters—review the mini‑map and plan your next route.");
+}
+// ===== End Story System =====
+
+
+// ===== Mini-Map =====
+const miniMap = document.getElementById('miniMap');
+const mctx = miniMap.getContext('2d');
+function drawMiniMap(){
+  // Clear
+  mctx.clearRect(0,0,miniMap.width, miniMap.height);
+  // Background
+  mctx.fillStyle = 'rgba(0,0,0,0.5)';
+  mctx.fillRect(0,0,miniMap.width, miniMap.height);
+
+  if(!canvas || !swimmer || !water || typeof water.level !== 'number') return;
+
+  const sx = miniMap.width / canvas.width;
+  const sy = miniMap.height / canvas.height;
+
+  // Water
+  mctx.fillStyle = 'rgba(0,120,200,0.6)';
+  const waterY = (typeof water.level==='number' ? water.level : canvas.height) * sy;
+  mctx.fillRect(0, waterY, miniMap.width, miniMap.height - waterY);
+
+  // Entities
+  if(Array.isArray(circles)){
+    circles.forEach(e => {
+      let color = '#ffcc00'; // victim
+      if(e.type==='corrupt') color = '#ff4d4d';
+      else if(e.type==='log') color = '#c58b54';
+      else if(e.type==='heart') color = '#ff5bd1';
+      else if(e.type==='crocodile') color = '#22ff22';
+      else if(e.type==='alligator') color = '#00dd88';
+      mctx.fillStyle = color;
+      mctx.beginPath();
+      mctx.arc(e.x * sx, e.y * sy, 2, 0, Math.PI*2);
+      mctx.fill();
+    });
+  }
+
+  // Swimmer
+  mctx.fillStyle = '#00ffea';
+  mctx.fillRect(swimmer.x * sx, swimmer.y * sy, Math.max(2, SWIMMER_PROPERTIES.width * sx), Math.max(2, SWIMMER_PROPERTIES.height * sy));
+
+  // Border + label
+  mctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  mctx.lineWidth = 1;
+  mctx.strokeRect(0,0,miniMap.width, miniMap.height);
+  mctx.fillStyle = 'rgba(255,255,255,0.7)';
+  mctx.font = '8px monospace';
+  mctx.fillText('MAP', 6, 12);
+}
+// ===== End Mini-Map =====
+
+// ===== Fauna Hazards =====
+function spawnCrocodile(x, y) {
+  circles.push({ x, y, radius: 20, type: 'crocodile', vx: (Math.random()*2-1)*1.2, vy: 0 });
+}
+function spawnAlligator(x, y) {
+  circles.push({ x, y, radius: 22, type: 'alligator', vx: (Math.random()*2-1)*1.0, vy: 0 });
+}
+// ===== End Fauna Hazards =====
+
+
     const gameContainer = document.getElementById('game-container');
 
     const menuScreen = document.getElementById('menu-screen');
@@ -62,10 +214,10 @@
 
     // --- Constants ---
     const SWIMMER_PROPERTIES = {
-      width: 54,
-      height: 34,
-      gravity: 0.28,
-      lift: -6.2,
+      width: 10,
+      height: 12,
+      gravity: 0.22,
+      lift: -5.5,
       bodyColor: '#FFD54F',
       headColor: '#F4D1A6',
       goggleColor: '#1E90FF',
@@ -75,7 +227,7 @@
     };
 
     const WATER_PROPERTIES = {
-      riseSpeed: 0.12,
+      riseSpeed: 0.08,
       color: 'rgba(0,119,190,0.7)',
       waveHeight: 7,
       waveLength: 0.05
@@ -83,7 +235,7 @@
 
     const ENTITY_PROPERTIES = {
       radius: 15,
-      speed: 2.6,
+      speed: 0.8,
       spawnRate: 95
     };
 
@@ -179,8 +331,8 @@
       const skyline = createSkylinePattern(W,H1);
       const houses  = createHousesPattern(W,H2);
       bgLayers = [
-        {img:skyline, y:canvas.height*0.25, speed:0.3, offset:0, height:H1},
-        {img:houses,  y:canvas.height*0.55, speed:0.8, offset:0, height:H2}
+        {img:skyline, y:canvas.height*0.25, speed:0.1, offset:0, height:H1},
+        {img:houses,  y:canvas.height*0.55, speed:0.25, offset:0, height:H2}
       ];
     }
 
@@ -191,7 +343,7 @@
       ctx.fillStyle = grad;
       ctx.fillRect(0,0,canvas.width,canvas.height);
       bgLayers.forEach(layer=>{
-        layer.offset = (layer.offset - layer.speed);
+        layer.offset = (layer.offset - layer.speed * speedMultiplier);
         const w = layer.img.width;
         let ox = layer.offset % w;
         if(ox > 0) ox -= w;
@@ -206,6 +358,16 @@
       canvas.width  = gameContainer.clientWidth;
       canvas.height = gameContainer.clientHeight;
       initBackground();
+      // Ensure water exists before any drawing
+      water = {
+        level: canvas.height * (1.0 - WATER_PROPERTIES.initialLevel),
+        waveLength: WATER_PROPERTIES.waveLength,
+        waveHeight: WATER_PROPERTIES.waveHeight
+      };
+
+      circles = [];
+      for(let i=0;i<2;i++){ spawnCrocodile(Math.random()*canvas.width*0.8 + canvas.width*0.1, water.level - 10 - Math.random()*40); }
+      for(let i=0;i<2;i++){ spawnAlligator(Math.random()*canvas.width*0.8 + canvas.width*0.1, water.level - 10 - Math.random()*40); }
 
       swimmer = {
         x: canvas.width/4,
@@ -284,7 +446,7 @@
       // Legs
       ctx.strokeStyle = SWIMMER_PROPERTIES.bodyColor;
       ctx.lineWidth = 3;
-      const kick = Math.sin(frameCount*0.3)*6;
+      const kick = Math.sin(frameCount*0.2)*6;
       ctx.beginPath();
       ctx.moveTo(s.x+s.width*0.25, s.y+torsoH);
       ctx.lineTo(s.x+s.width*0.25, s.y+torsoH+10 + kick);
@@ -306,9 +468,10 @@
     }
 
     function drawWater(){
+      if(!water || typeof water.level!=='number'){ return; }
       ctx.fillStyle = WATER_PROPERTIES.color;
       ctx.beginPath();
-      ctx.moveTo(0, water.level);
+      ctx.moveTo(0, (water && typeof water.level==='number') ? water.level : canvas.height*0.6);
       for(let i=0;i<canvas.width;i++){
         ctx.lineTo(i, water.level + Math.sin(i*WATER_PROPERTIES.waveLength + frameCount*0.1)*WATER_PROPERTIES.waveHeight);
       }
@@ -325,7 +488,7 @@
       ctx.lineWidth=2;
       ctx.beginPath();
       const rr=14 + Math.sin(frameCount*0.3)*2;
-      ctx.arc(x, water.level-2, rr, 0.2, Math.PI-0.2);
+      ctx.arc(x, ((water && typeof water.level==='number') ? water.level : canvas.height*0.6)-2, rr, 0.2, Math.PI-0.2);
       ctx.stroke();
       // head
       ctx.fillStyle='#F4D1A6';
@@ -349,7 +512,7 @@
       ctx.lineWidth=2;
       ctx.beginPath();
       const rr=12 + Math.sin(frameCount*0.25)*1.5;
-      ctx.arc(x, water.level, rr, 0.1, Math.PI-0.1);
+      ctx.arc(x, (water && typeof water.level==='number') ? water.level : canvas.height*0.6, rr, 0.1, Math.PI-0.1);
       ctx.stroke();
       // suit
       ctx.fillStyle='#333'; ctx.fillRect(x-8, y, 16, 20);
@@ -362,12 +525,105 @@
       ctx.fillStyle='#FFD700'; ctx.font='10px sans-serif'; ctx.fillText('₱', x+12, y+13);
     }
 
+    
+    function drawLog(e){
+      const x = e.x, y = e.y;
+      ctx.fillStyle = '#8B4513'; // brown log
+      ctx.fillRect(x-15, y-5, 30, 10);
+      ctx.strokeStyle = '#5A2D0C';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x-10, y, 5, 0, Math.PI*2);
+      ctx.arc(x+10, y, 5, 0, Math.PI*2);
+      ctx.stroke();
+    }
+
+    
+    function drawHeart(e){
+      const x = e.x, y = e.y;
+      ctx.fillStyle = 'red';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.bezierCurveTo(x-8, y-12, x-20, y+5, x, y+15);
+      ctx.bezierCurveTo(x+20, y+5, x+8, y-12, x, y);
+      ctx.fill();
+      ctx.strokeStyle = '#660000';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    
+    function drawCrocodile(e){
+      const x=e.x, y=e.y;
+      // body
+      ctx.fillStyle = '#228B22';
+      ctx.beginPath();
+      ctx.ellipse(x, y, e.radius*1.3, e.radius*0.6, 0, 0, Math.PI*2);
+      ctx.fill();
+      // back ridges
+      ctx.strokeStyle = '#004400';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for(let i=-3;i<=3;i++){
+        ctx.moveTo(x + i*6, y-6);
+        ctx.lineTo(x + i*6, y-12);
+      }
+      ctx.stroke();
+      // eye
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(x+6, y-4, 2, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#000000';
+      ctx.beginPath(); ctx.arc(x+6, y-4, 1, 0, Math.PI*2); ctx.fill();
+    }
+
+    function drawAlligator(e){
+      const x=e.x, y=e.y;
+      // body (darker green)
+      ctx.fillStyle = '#116644';
+      ctx.beginPath();
+      ctx.ellipse(x, y, e.radius*1.4, e.radius*0.5, 0, 0, Math.PI*2);
+      ctx.fill();
+      // snout
+      ctx.fillStyle = '#0c4f34';
+      ctx.fillRect(x+6, y-4, 12, 8);
+      // teeth
+      ctx.fillStyle = '#ffffff';
+      for(let i=0;i<4;i++){ ctx.fillRect(x+10+i*3, y+2, 1, 3); }
+      // eye
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(x-4, y-4, 2, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#000000';
+      ctx.beginPath(); ctx.arc(x-4, y-4, 1, 0, Math.PI*2); ctx.fill();
+    }
+
+    
+    function drawColorTest(){
+      const x=10, y=10, w=84, h=8;
+      const cols=['#ff0000','#ffa500','#ffff00','#00ff00','#00ffff','#0000ff','#8b00ff'];
+      for(let i=0;i<cols.length;i++){
+        ctx.fillStyle = cols[i];
+        ctx.fillRect(x + i*(w/cols.length), y, (w/cols.length)-1, h);
+      }
+    }
+
     function drawEntities(){
       circles.forEach(e => {
         if(e.type==='victim') drawVictim(e);
+        else if(e.type==='crocodile'){ drawCrocodile(e); }
+        else if(e.type==='alligator'){ drawAlligator(e); }
         else if(e.type==='corrupt') drawCorrupt(e);
+        else if(e.type==='log') drawLog(e);
+        else if(e.type==='heart') drawHeart(e);
       });
     }
+
+    
+let speedMultiplier = 1;
+function updateSpeed(){
+  if(frameCount % (60*5) === 0){ // every ~5 seconds at 60fps
+    speedMultiplier *= 1.02; // increase by 2%
+  }
+}
 
     // --- Updates ---
     function updateSwimmer(){
@@ -379,18 +635,22 @@
 
       if(swimmer.y < 0){ swimmer.y = 0; swimmer.velocity = 0; }
 
-      const surface = water.level - swimmer.height * 0.6;
+      const surface = ((water && typeof water.level==='number') ? water.level : canvas.height*0.6) - swimmer.height * 0.6;
 
       if(!isDiving){
         if(swimmer.y > surface){
           swimmer.y = surface;
           swimmer.velocity = 0;
           swimmer.jumpsLeft = SWIMMER_PROPERTIES.maxJumps;
+      if(swimmer.velocity < -2){
+        swimmer.velocity = -0.5; // even more limited ascent speed
+      }
+
         } else {
-          swimmer.velocity += 0.06;
+          swimmer.velocity += 0.005; // ultra slow rising after dive
         }
       } else {
-        const maxDepth = Math.min(canvas.height - 40, water.level + 80);
+        const maxDepth = Math.min(canvas.height - 40, ((water && typeof water.level==='number') ? water.level : canvas.height*0.6) + 80);
         if(swimmer.y > maxDepth){
           swimmer.y = maxDepth;
           swimmer.velocity = Math.min(0, swimmer.velocity);
@@ -399,29 +659,35 @@
     }
 
     function updateWater(){
-      if(water.level > 0){
+      if(water && typeof water.level==='number' && water.level > 0){
         water.level -= WATER_PROPERTIES.riseSpeed;
       }
     }
 
     function spawnEntity(){
       if(frameCount % ENTITY_PROPERTIES.spawnRate === 0){
-        const isVictim = Math.random() > 0.55;
-        const ySurf = water.level - 16;
+        const rand = Math.random();
+        const isHeart = rand > 0.85;
+        const isVictim = rand > 0.55;
+        const isLog = rand < 0.2;
+        const ySurf = ((water && typeof water.level==='number') ? water.level : canvas.height*0.6) - 16;
         const victimOffset = Math.random()*40; // some victims underwater
         const e = {
           x: canvas.width + ENTITY_PROPERTIES.radius,
           y: (isVictim ? (ySurf + victimOffset) : (ySurf + Math.random()*20)),
           radius: ENTITY_PROPERTIES.radius,
-          type: isVictim ? 'victim' : 'corrupt'
+          type: isHeart ? 'heart' : (isLog ? 'log' : (isVictim ? 'victim' : 'corrupt'))
         };
         circles.push(e);
       }
     }
 
     function updateEntities(){
+      if(Array.isArray(circles) && !StoryFlags.faunaSeen){ if(circles.some(e=>e.type==='crocodile' || e.type==='alligator')) faunaWarning(); }
+      // drift fauna
+      circles.forEach(e=>{ if(e.type==='crocodile' || e.type==='alligator'){ e.x += (e.vx||0); e.y += (e.vy||0); }});
       circles.forEach((e, idx) => {
-        e.x -= ENTITY_PROPERTIES.speed;
+        e.x -= ENTITY_PROPERTIES.speed * speedMultiplier;
         const distX = (swimmer.x + swimmer.width/2) - e.x;
         const distY = (swimmer.y + swimmer.height/2) - e.y;
         const distance = Math.hypot(distX, distY);
@@ -439,7 +705,11 @@
       if(e.type==='victim'){
         score++;
         water.level += 50;
-        if(water.level > canvas.height) water.level = canvas.height;
+        if(water && typeof water.level==='number' && water.level > canvas.height) water.level = canvas.height;
+      } else if(e.type==='heart'){
+        lives++;
+      } else if(e.type==='log'){
+        lives--;
       } else if(e.type==='corrupt'){
         lives--;
       }
@@ -448,7 +718,7 @@
     }
 
     function checkGameOver(){
-      if(water.level <= 0) gameState = 'gameOver';
+      if(water && typeof water.level==='number' && water.level <= 0) gameState = 'gameOver';
       if(lives <= 0) gameState = 'gameOver';
     }
 
@@ -468,7 +738,7 @@
     // --- Loop ---
     function gameLoop(){
       if(gameState!=='playing'){
-        if(gameState==='gameOver') showGameOver();
+        if(gameState==='gameOver'){ if(typeof score==='number') debriefStory(score); showGameOver(); }
         return;
       }
       ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -480,7 +750,11 @@
       drawWater();
       drawSwimmer();
       drawEntities();
+      drawMiniMap();
+      drawColorTest();
       checkGameOver();
+      updateSpeed();
+      if(typeof score==='number' && score>=50 && !StoryFlags.midpointShown){ midpointStory(); }
       frameCount++;
       animationFrameId = requestAnimationFrame(gameLoop);
     }
@@ -521,9 +795,10 @@
     });
 
     startButton.addEventListener('click', ()=>{
+      showIntro();
       menuScreen.style.display = 'none';
       setupGame();
-      gameState = 'playing';
+      gameState = 'story'; // pause into story first
       gameLoop();
     });
 
@@ -534,7 +809,7 @@
       if(wasPlaying){ gameState='playing'; gameLoop(); }
       else{
         ctx.clearRect(0,0,canvas.width,canvas.height);
-        drawParallaxBackground(); drawWater(); drawSwimmer();
+        drawParallaxBackground(); drawWater(); drawSwimmer(); drawMiniMap(); drawColorTest();
       }
     });
 
@@ -545,5 +820,19 @@
       drawSwimmer();
     };
   </script>
+
+<div id="error-log" style="position:fixed;left:8px;bottom:8px;background:rgba(0,0,0,0.6);color:#fff;padding:6px 8px;font:12px monospace;z-index:9999;display:none"></div>
+<script>
+  (function(){
+    const box = document.getElementById('error-log');
+    function show(msg){
+      if(!box) return;
+      box.style.display='block';
+      box.textContent = 'Error: ' + msg;
+    }
+    window.addEventListener('error', function(e){ show(e.message); });
+    window.addEventListener('unhandledrejection', function(e){ show((e.reason && e.reason.message) || 'Promise rejected'); });
+  })();
+</script>
 </body>
 </html>
