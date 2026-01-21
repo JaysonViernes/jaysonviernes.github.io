@@ -1,0 +1,10 @@
+{
+  "source": "Crocodile-3GIF.gif",
+  "frameWidth": 2048,
+  "frameHeight": 2048,
+  "frames": 1,
+  "fps": 10.0,
+  "durations_ms": [
+    100
+  ]
+}
