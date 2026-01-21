@@ -62,6 +62,16 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
+// ===== Swimmer Sprite Sheet (replace GIF) =====
+// Place 'runngboy_sheet.png' in the same folder as Index.html
+const swimmerSheet = new Image();
+swimmerSheet.src = "runngboy_sheet.png";
+const SWIMMER_SPRITE = { frameW: 263, frameH: 334, frames: 16, fps: 25 };
+let lastTS = 0;      // requestAnimationFrame timestamp tracking
+let dtSec = 0;       // delta time in seconds (used for sprite animation)
+let swimAnimT = 0;   // animation time accumulator
+// ===== End Sprite Sheet =====
+
 // ===== Story System =====
 const storyOverlay = document.getElementById('story-overlay');
 const storyTitle = document.getElementById('story-title');
@@ -236,7 +246,7 @@ function spawnAlligator(x, y) {
     };
 
     const WATER_PROPERTIES = {
-      riseSpeed: 0.08,
+      riseSpeed: 0.02,
       color: 'rgba(0,119,190,0.7)',
       waveHeight: 7,
       waveLength: 0.05
@@ -250,121 +260,108 @@ function spawnAlligator(x, y) {
 
     let frameCount = 0;
 
-    // ===== Parallax Background =====
+    // ===== Parallax Background (Image-Based) =====
+    // Upload these files alongside Index.html:
+    // - Manila3 [Converted].png
+    // - Manila6.png
+    // If you rename them, update the src paths below.
     let bgLayers = [];
+    const bgImgs = {
+      far: new Image(),
+      near: new Image()
+    };
+    // Use URL-encoded filename for the one with spaces/brackets
+    bgImgs.far.src  = "Manila3%20%5BConverted%5D.png";
+    bgImgs.near.src = "Manila6.png";
 
-    function createSkylinePattern(width, height){
-      const off = document.createElement('canvas');
-      off.width = width; off.height = height;
-      const c = off.getContext('2d');
-      const baseY = height * 0.9;
-      const colors = ['#6b7b8c','#5e6d7c','#4f5d6a'];
-      let x = 0;
-      while(x < width){
-        const w = 40 + Math.random()*80;
-        const h = height*(0.25 + Math.random()*0.5);
-        const y = baseY - h;
-        const col = colors[Math.floor(Math.random()*colors.length)];
-        c.fillStyle = col;
-        c.fillRect(x,y,w,h);
-        c.fillStyle = 'rgba(255,255,210,0.3)';
-        const cols = Math.max(2, Math.floor(w/12));
-        const rows = Math.max(2, Math.floor(h/20));
-        for(let i=0;i<cols;i++){
-          for(let j=0;j<rows;j++){
-            if(Math.random()<0.15){
-              const wx = x + 6 + i*(w/cols);
-              const wy = y + 6 + j*(h/rows);
-              c.fillRect(wx,wy,4,6);
-            }
-          }
-        }
-        if(Math.random()<0.25){
-          c.strokeStyle = col;
-          c.lineWidth = 2;
-          c.beginPath();
-          c.moveTo(x+w*0.5,y);
-          c.lineTo(x+w*0.5,y - 10 - Math.random()*12);
-          c.stroke();
-        }
-        x += w + 10;
-      }
-      return off;
-    }
+    // Road layer (repeat-x)
+    const roadImg = new Image();
+    roadImg.src = "BrickRoad.png";
+    let roadY = null; // set in setupGame based on swimmer start
+    let roadH = null;
+    let roadOffset = 0;
 
-    function createHousesPattern(width, height){
-      const off = document.createElement('canvas');
-      off.width = width; off.height = height;
-      const c = off.getContext('2d');
-      const groundY = height * 0.95;
-      c.fillStyle = '#8DBF87';
-      c.fillRect(0,groundY-8,width,8);
-      let x = 0;
-      while(x < width){
-        const houseW = 50 + Math.random()*30;
-        const houseH = 30 + Math.random()*25;
-        const y = groundY - houseH;
-        c.fillStyle = '#c9a27a';
-        c.fillRect(x,y,houseW,houseH);
-        c.fillStyle = '#7a4f36';
-        c.beginPath();
-        c.moveTo(x-3,y);
-        c.lineTo(x+houseW/2,y-12);
-        c.lineTo(x+houseW+3,y);
-        c.closePath();
-        c.fill();
-        c.fillStyle = '#6a3b28';
-        c.fillRect(x+houseW*0.15, y+houseH-14, 8,14);
-        c.fillStyle = '#eae3c8';
-        c.fillRect(x+houseW*0.6, y+houseH*0.4, 10,8);
-
-        if(Math.random()<0.7){
-          const tx = x + houseW + 6;
-          const th = 18 + Math.random()*10;
-          c.fillStyle = '#5b7c4d';
-          c.beginPath();
-          c.arc(tx, groundY - th, 8, 0, Math.PI*2);
-          c.fill();
-          c.fillStyle = '#6b4a2f';
-          c.fillRect(tx-2, groundY-10, 4,10);
-        }
-        x += houseW + 30;
-      }
-      return off;
-    }
 
     function initBackground(){
-      const W = Math.max(800, canvas.width);
-      const H1 = Math.max(120, Math.floor(canvas.height*0.45));
-      const H2 = Math.max(120, Math.floor(canvas.height*0.55));
-      const skyline = createSkylinePattern(W,H1);
-      const houses  = createHousesPattern(W,H2);
+      // Align BOTH layers to the SAME "ground" baseline (bottom aligned).
+      // You can adjust this to move the buildings up/down:
+      const baselineY = Math.floor(canvas.height * 0.66);
+
+      // Desired on-screen heights for each layer (tweak to taste)
+      const farH  = Math.max(140, Math.floor(canvas.height * 0.35));
+      const nearH = Math.max(180, Math.floor(canvas.height * 0.45));
+
       bgLayers = [
-        {img:skyline, y:canvas.height*0.25, speed:0.1, offset:0, height:H1},
-        {img:houses,  y:canvas.height*0.55, speed:0.25, offset:0, height:H2}
+        { key:'far',  img:bgImgs.far,  baseY: baselineY, speed:0.10, offset:0, targetH: farH  },
+        { key:'near', img:bgImgs.near, baseY: baselineY, speed:0.22, offset:0, targetH: nearH }
       ];
     }
 
     function drawParallaxBackground(){
+      // Sky gradient base
       const grad = ctx.createLinearGradient(0,0,0,canvas.height);
       grad.addColorStop(0,'#8ED6FF');
       grad.addColorStop(1,'#D0F0FF');
       ctx.fillStyle = grad;
       ctx.fillRect(0,0,canvas.width,canvas.height);
-      bgLayers.forEach(layer=>{
+
+      // Draw each parallax layer (repeat-x), bottoms aligned to baseY
+      bgLayers.forEach(layer => {
+        const img = layer.img;
+        if(!img || !img.complete || img.naturalWidth === 0) return;
+
+        const scale = layer.targetH / img.naturalHeight;
+        const wScaled = img.naturalWidth * scale;
+        const hScaled = img.naturalHeight * scale;
+
+        // Bottom-align: y = baseline - scaledHeight
+        const y = layer.baseY - hScaled;
+
+        // Scroll
         layer.offset = (layer.offset - layer.speed * speedMultiplier);
-        const w = layer.img.width;
-        let ox = layer.offset % w;
-        if(ox > 0) ox -= w;
-        for(let x = ox; x < canvas.width; x += w){
-          ctx.drawImage(layer.img, x, layer.y, w, layer.height);
+        let ox = layer.offset % wScaled;
+        if(ox > 0) ox -= wScaled;
+
+        for(let x = ox; x < canvas.width; x += wScaled){
+          ctx.drawImage(img, x, y, wScaled, hScaled);
         }
       });
+
+      // Road strip aligned to swimmer start
+      drawRoadLayer();
     }
+    function drawRoadLayer(){
+      if(roadY === null || roadH === null) return;
+      if(!roadImg || !roadImg.complete || roadImg.naturalWidth === 0) return;
+
+      // Scale road image to desired height
+      const scale = roadH / roadImg.naturalHeight;
+      const wScaled = roadImg.naturalWidth * scale;
+
+      // Subtle parallax
+      roadOffset = (roadOffset - 0.30 * speedMultiplier) % wScaled;
+      let ox = roadOffset;
+      if(ox > 0) ox -= wScaled;
+
+      // Clip to road strip area
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, roadY, canvas.width, roadH);
+      ctx.clip();
+
+      for(let x = ox; x < canvas.width; x += wScaled){
+        ctx.drawImage(roadImg, x, roadY, wScaled, roadH);
+      }
+      ctx.restore();
+    }
+
     // ===== End Background =====
 
     function setupGame(){
         resetStory();
+      lastTS = 0;
+      dtSec = 0;
+      swimAnimT = 0;
 canvas.width  = gameContainer.clientWidth;
       canvas.height = gameContainer.clientHeight;
       initBackground();
@@ -389,6 +386,13 @@ canvas.width  = gameContainer.clientWidth;
         lift: SWIMMER_PROPERTIES.lift,
         jumpsLeft: SWIMMER_PROPERTIES.maxJumps
       };
+
+      // Road aligned to swimmer start position
+      roadH = Math.max(90, Math.floor(canvas.height * 0.22));
+      roadY = Math.floor(swimmer.y + swimmer.height * 10.80);
+      roadY = Math.max(0, Math.min(canvas.height - roadH, roadY));
+      roadOffset = 0;
+
 
       // Higher starting water level
       water = { level: Math.floor(canvas.height * 0.7), riseSpeed: WATER_PROPERTIES.riseSpeed };
@@ -476,6 +480,31 @@ canvas.width  = gameContainer.clientWidth;
         }
       }
     }
+
+// Draw swimmer using sprite sheet (better performance than GIF)
+function drawSwimmerSprite(){
+  if(!swimmerSheet || !swimmerSheet.complete) return;
+
+  // advance animation using real time
+  swimAnimT += dtSec;
+  const frame = Math.floor(swimAnimT * SWIMMER_SPRITE.fps) % SWIMMER_SPRITE.frames;
+
+  const sx = frame * SWIMMER_SPRITE.frameW;
+  const sy = 0;
+
+  // On-screen size (tweak these if you want the character bigger/smaller)
+  const dw = 64;
+  const dh = 64;
+
+  const dx = swimmer.x + swimmer.width/2 - dw/2;
+  const dy = swimmer.y + swimmer.height/2 - dh/2;
+
+  ctx.drawImage(
+    swimmerSheet,
+    sx, sy, SWIMMER_SPRITE.frameW, SWIMMER_SPRITE.frameH,
+    dx, dy, dw, dh
+  );
+}
 
     function drawWater(){
       if(!water || typeof water.level!=='number'){ return; }
@@ -745,7 +774,10 @@ function updateSpeed(){
     }
 
     // --- Loop ---
-    function gameLoop(){
+    function gameLoop(ts = performance.now()){
+      if(!lastTS) lastTS = ts;
+      dtSec = Math.min(0.05, (ts - lastTS) / 1000);
+      lastTS = ts;
       if(gameState!=='playing'){
         if(gameState==='gameOver'){ if(typeof score==='number') debriefStory(score); showGameOver(); }
         // Safety guard: if we're in 'story' but nothing to show, auto-start playing
@@ -763,7 +795,7 @@ ctx.clearRect(0,0,canvas.width,canvas.height);
       spawnEntity();
       updateEntities();
       drawWater();
-      drawSwimmer();
+      drawSwimmerSprite();
       drawEntities();
       drawMiniMap();
       drawColorTest();
@@ -824,7 +856,7 @@ ctx.clearRect(0,0,canvas.width,canvas.height);
       if(wasPlaying){ gameState='playing'; gameLoop(); }
       else{
         ctx.clearRect(0,0,canvas.width,canvas.height);
-        drawParallaxBackground(); drawWater(); drawSwimmer(); drawMiniMap(); drawColorTest();
+        drawParallaxBackground(); drawWater(); drawSwimmerSprite(); drawMiniMap(); drawColorTest();
       }
     });
 
@@ -832,7 +864,7 @@ ctx.clearRect(0,0,canvas.width,canvas.height);
       setupGame();
       drawParallaxBackground();
       drawWater();
-      drawSwimmer();
+      drawSwimmerSprite();
     };
   </script>
 
