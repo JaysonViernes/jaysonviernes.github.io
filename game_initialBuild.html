@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flood Rush: Fast Sprint</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link href=".\css\style.css" rel="stylesheet">
+</head>
+<body onload="" class="flex items-center justify-center h-screen">
+  <div id="game-container" class="relative w-full h-full max-w-5xl aspect-[16/9] overflow-hidden shadow-2xl border-4 border-gray-800">
+	<div id="assets">
+		<img id="flood_sp" src="./assets/flood.png" width=3000></img>
+		<img id="house1_sp" src="./assets/house_1.png"></img>
+		<img id="civ_sp" src="./assets/civilian.png" width="50px"></img>
+		<img id="croc_sp" src="./assets/croc.png" width="83px"></img>
+		<img id="bad_sp" src="./assets/corrupt.png" width="62px"></img>
+		<img id="player_sp" src="./assets/player.png" width="186px"></img>
+	</div>
+  
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="warning-overlay" class="absolute inset-0 border-[30px] border-red-600 pointer-events-none z-10 flex items-center justify-center">
+        <div class="bg-red-600 text-white px-4 py-2 text-xs uppercase">Flood Imminent!</div>
+    </div>
+
+    <div id="ui-container" class="absolute top-0 left-0 w-full p-6 flex justify-between items-start text-white game-ui text-[10px]">
+      <div>
+        <div id="hp-display" class="text-red-400 mb-1">HP: ❤️❤️❤️</div>
+        <div id="score-display" class="text-yellow-400 font-bold">RESCUES: 0</div>
+        <div id="hiscore-display" class="text-yellow-400 font-bold">HIGH SCORE: <span id="hiscore">0</span></div>
+      </div>
+      <div class="text-right">
+        <div id="flood-display" class="text-cyan-400 italic">FLOOD DISTANCE</div>
+        <div class="mt-2 w-48 h-3 bg-gray-900 rounded-full border-2 border-white overflow-hidden relative">
+            <div id="flood-bar" class="h-full bg-blue-500 transition-all duration-100" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="menu-screen" class="absolute inset-0 bg-black/95 flex flex-col items-center justify-center text-white text-center p-6 z-50">
+      <h1 class="text-3xl font-bold mb-4 text-blue-500 italic">Flood Rush: Fast Sprint</h1>
+      <div class="text-[9px] space-y-4 mb-8 text-gray-400 max-w-md leading-relaxed">
+        <!-- <p>The safe zone is on: <span class="text-white">100m</span>.</p> -->
+        <p><span class="text-yellow-400">YELLOW</span>: Rescues (Scoop them up!)</p>
+        <p><span class="text-green-500">GREEN</span> & <span class="text-amber-900">BROWN</span>: Hazards (Damage!)</p>
+      </div>
+      <button id="start-button" class="bg-blue-600 hover:bg-blue-500 py-4 px-12 rounded-full text-lg shadow-[0_5px_0_#1e3a8a] active:translate-y-1 transition-all">
+        START SPRINT
+      </button>
+    </div>
+  </div>
+  <script src=".\js\game.js"></script>
+</body>
+</html>

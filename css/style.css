@@ -1,0 +1,61 @@
+/* GAME CONTAINER */
+body
+{
+	font-family: 'Press Start 2P', cursive;
+	overflow: hidden;
+	background: #000;
+	background-image: url("../assets/bg.png");
+	background-position: center;
+	background-attachment: fixed;
+	background-size: cover;
+	touch-action: none;
+}
+
+canvas
+{
+	display: block;
+	background-color: lightskyblue;
+}
+
+/* UI */
+#assets { display: none; }
+
+.game-ui
+{
+	text-shadow: 2px 2px 0px #000;
+	pointer-events: none;
+}
+
+/* FLOOD WARNING */
+#warning-overlay
+{
+	display: none;
+	animation: flash 0.7s infinite;
+}
+
+@keyframes flash
+{
+	0% { opacity: 0; }
+	35% { opacity: 0.4; }
+	40% { opacity: 0.4; }
+	75% { opacity: 0; }
+	100% { opacity: 0; }
+}
+
+/* POP-UP EVENTS */
+.rescue-pop, .hp-pop
+{
+	position: absolute;
+	font-size: 10px;
+	pointer-events: none;
+	animation: floatUp 0.8s forwards;
+	z-index: 20;
+}
+.rescue-pop { color: #fbbf24; }
+.hp-pop { color: #f87171; }
+
+@keyframes floatUp
+{
+	0% { transform: translateY(0); opacity: 1; }
+	100% { transform: translateY(-50px); opacity: 0; }
+}
