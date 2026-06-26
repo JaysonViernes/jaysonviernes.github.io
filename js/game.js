@@ -59,7 +59,7 @@ function initGame() {
 	worldX = 0; 
 	distanceToGoal = 100;
 	floodX = -750; 
-	floodBaseSpeed = 0;
+	floodBaseSpeed = 3;
 	platforms = [{ x: 0, y: 450, w: 1200, h: 500, angle: 0 }];
 	entities = [];
 	rescueMilestone = 0;
