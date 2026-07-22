@@ -11,15 +11,21 @@
 <body onload="" class="flex items-center justify-center h-screen">
   <div id="game-container" class="relative w-full h-full max-w-5xl aspect-[16/9] overflow-hidden shadow-2xl border-4 border-gray-800">
 	<div id="assets">
-		<img id="flood_sp" src="./assets/flood.png" width=3000></img>
+		<img id="bg_sp" src="./assets/bg.png" style="opacity: 0.1;"></img>
 		<img id="house1_sp" src="./assets/house_1.png"></img>
+		<img id="house2_sp" src="./assets/house_2.png"></img>
+		<img id="house3_sp" src="./assets/house_3.png"></img>
+		<img id="house4_sp" src="./assets/house_4.png"></img>
+		<img id="house5_sp" src="./assets/house_5.png"></img>
 		<img id="civ_sp" src="./assets/civilian.png" width="50px"></img>
 		<img id="croc_sp" src="./assets/croc.png" width="83px"></img>
 		<img id="bad_sp" src="./assets/corrupt.png" width="62px"></img>
 		<img id="player_sp" src="./assets/player.png" width="186px"></img>
+		<img id="flood_sp" src="./assets/flood.png" width=3000></img>
 	</div>
   
     <canvas id="gameCanvas"></canvas>
+    <!-- <canvas id="gameCanvas2"></canvas> -->
 
     <div id="warning-overlay" class="absolute inset-0 border-[30px] border-red-600 pointer-events-none z-10 flex items-center justify-center">
         <div class="bg-red-600 text-white px-4 py-2 text-xs uppercase">Flood Imminent!</div>
@@ -43,6 +49,12 @@
       <h1 class="text-3xl font-bold mb-4 text-blue-500 italic">Flood Rush: Fast Sprint</h1>
       <div class="text-[9px] space-y-4 mb-8 text-gray-400 max-w-md leading-relaxed">
         <!-- <p>The safe zone is on: <span class="text-white">100m</span>.</p> -->
+		<div id='gameover-scores' style="display: none; font-size: 1.75em;">
+			<p id="gameover-hi-score" class="text-yellow-400">High Score: <span id="hiscore-menu">-</span>
+			<em><sup id="hi-score-notice" class="text-green-500" style="display: none; font-size: .5em;">NEW HIGH SCORE!</sup></em></p>
+			<p>Final Score: <span id="final-score">-</span></p>
+		<br>
+		</div>
         <p><span class="text-yellow-400">YELLOW</span>: Rescues (Scoop them up!)</p>
         <p><span class="text-green-500">GREEN</span> & <span class="text-amber-900">BROWN</span>: Hazards (Damage!)</p>
       </div>

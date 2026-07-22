@@ -1,12 +1,20 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+// const canvas2 = document.getElementById('gameCanvas2');
+// const ctx2 = canvas2.getContext('2d');
 
 // Import Assets
-const sp_flood = document.getElementById("flood_sp");
+const sp_bg = document.getElementById("bg_sp");
+const sp_plat1 = document.getElementById("house1_sp");
+const sp_plat2 = document.getElementById("house2_sp");
+const sp_plat3 = document.getElementById("house3_sp");
+const sp_plat4 = document.getElementById("house4_sp");
+const sp_plat5 = document.getElementById("house5_sp");
 const sp_civ = document.getElementById("civ_sp");
 const sp_croc = document.getElementById("croc_sp");
 const sp_bad = document.getElementById("bad_sp");
 const sp_player = document.getElementById("player_sp");
+const sp_flood = document.getElementById("flood_sp");
 
 // Animations
 const croc_anim = {
@@ -29,7 +37,7 @@ let gameState = 'start';
 let enableMovement = false;
 let frameCount = 0;
 let worldX = 0;
-let distanceToGoal = 100;
+let parallaxW = 0; 
 
 // Flood Engine
 var floodX; 
@@ -57,9 +65,9 @@ let entities = [];
 function initGame() {
 	Object.assign(player, { x: 400, y: 100, vx: 0, vy: 0, hp: 3, rescues: 0, invuln: 0 });
 	worldX = 0; 
-	distanceToGoal = 100;
+	parallaxW = 0; 
 	floodX = -750; 
-	floodBaseSpeed = 3;
+	floodBaseSpeed = 2.5;
 	platforms = [{ x: 0, y: 450, w: 1200, h: 500, angle: 0 }];
 	entities = [];
 	rescueMilestone = 0;
@@ -67,8 +75,12 @@ function initGame() {
 	gameState = 'playing';
 	gameLoop();
 	animate_player();
+	floodMvmnt();
 	framesDrawn = 0;
-	if (typeof(Storage) !== "undefined") {
+	
+	document.getElementById('hi-score-notice').style.display = 'none';
+	
+	if (typeof(Storage) != "undefined") {
 		console.log("Your browser supports Web storage, your highscores will be saved.");
 		if (localStorage.highScore) highScore = localStorage.getItem("highScore");
 		else {
@@ -146,7 +158,14 @@ function update() {
 	player.vy += GRAVITY;
 	player.y += player.vy;
 
-	if (player.rescues > highScore) highScore = player.rescues;
+	if (typeof(Storage) != "undefined") {
+		if (player.rescues > highScore) {
+			document.getElementById('hi-score-notice').style.display = 'inline';
+			highScore = player.rescues;
+			// document.getElementById('gameover-hi-score').style.color = '#22c55e';
+		}
+	}
+	else highscore = 'Unsupported';
 	addLives();
 	
 	player.onGround = false;
@@ -166,7 +185,6 @@ function update() {
 	});
 
 	worldX += player.vx;
-	distanceToGoal -= player.vx / 100;
 	
 	floodBaseSpeed += 0.0001;
 	let playerWorldX = player.x + worldX;
@@ -202,7 +220,6 @@ function update() {
 		keys.down = true;
 		localStorage.setItem("highScore", highScore);
 	}
-	// if (distanceToGoal <= 0) gameState = 'win';
 
 	document.getElementById('warning-overlay').style.display = (distFromFlood < 400) ? 'flex' : 'none';
 	if (platforms[platforms.length-1].x - worldX < canvas.width * 2) generateLevel(platforms[platforms.length-1].x + 200);
@@ -212,6 +229,8 @@ function draw() {
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	ctx.save();
 	ctx.translate(-worldX, 0);
+	
+	parallax();
 	
 	platforms.forEach(p => {  
 		ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
@@ -255,7 +274,6 @@ function draw() {
 			ctx.fillStyle = '#fbbf24'; ctx.fillRect(e.x - 20, e.y - 50, (e.timer/10)*60, 10);
 		}
 	});
-
 	
 	/* Old Wave */
 	let grad = ctx.createLinearGradient(floodX - 400, 0, floodX, 0);
@@ -265,7 +283,7 @@ function draw() {
 	ctx.moveTo(floodX, 0);
 	for(let i=0; i<canvas.height; i+=25) ctx.lineTo(floodX + Math.sin((frameCount+i)*0.1)*10, i);
 	ctx.stroke();
-	
+		
 	ctx.restore();
 	
 	if (!(player.invuln % 4 > 2)) {
@@ -281,6 +299,23 @@ function draw() {
 	// document.getElementById('dist-display').textContent = `${Math.max(0, Math.floor(distanceToGoal))}m TO SAFETY`;
 	let prox = Math.min(100, (1 - ((player.x + worldX) - floodX) / 800) * 100);
 	document.getElementById('flood-bar').style.width = Math.max(0, prox) + '%';
+}
+
+function parallax() {
+	if (gameState != "playing") {
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		return;
+	}
+		
+	parallaxW += player.vx;
+	if (parallaxW > sp_bg.naturalWidth) parallaxW = 0;
+	
+	ctx.drawImage(sp_bg, parallaxW, 0, canvas.width, sp_bg.naturalHeight, worldX, 0, canvas.width, canvas.height);
+	
+	// if (parallaxW == sp_bg.naturalWidth / 2) tile2 = ctx.drawImage(sp_bg, parallaxW + canvas.width, 0, (2 * canvas.width), sp_bg.naturalHeight, worldX, 0, canvas.width, canvas.height);
+	
+	console.log(`player.vx = ${player.vx}`);
+	console.log(`worldX = ${worldX}`);
 }
 
 function animate_player() {
@@ -304,26 +339,28 @@ function animate_player() {
 	}
 }
 
-function animate_croc(e) {
-	requestAnimationFrame(animate_croc);
+// function animate_croc(e) {
+	// requestAnimationFrame(animate_croc);
 				
-	croc_anim.currFrame = croc_anim.currFrame % croc_anim.totalFrames;
-	croc_anim.frameSrc = croc_anim.currFrame * croc_anim.w
-	ctx.drawImage(
-		sp_croc, croc_anim.frameSrc, 0,
-		croc_anim.w, croc_anim.h,
-		e.x - 15, e.y - 15,
-		croc_anim.w, croc_anim.h
-	);
+	// croc_anim.currFrame = croc_anim.currFrame % croc_anim.totalFrames;
+	// croc_anim.frameSrc = croc_anim.currFrame * croc_anim.w
+	// ctx.drawImage(
+		// sp_croc, croc_anim.frameSrc, 0,
+		// croc_anim.w, croc_anim.h,
+		// e.x - 15, e.y - 15,
+		// croc_anim.w, croc_anim.h
+	// );
 	
-	if (framesDrawn >= 8) croc_anim.currFrame++;
-}
+	// if (framesDrawn >= 8) croc_anim.currFrame++;
+// }
 
 function floodMvmnt() {
-	let flood_w = canvas.height * (867 / 1058);
-	let flood_h = canvas.height;
-	ctx.drawImage(sp_flood, 0, 0, flood_w, flood_h);
-	ctx.moveTo(floodX, 0);
+	let flood_w = ctx.height * (867 / 1058);
+	let flood_h = ctx.height;
+	ctx.drawImage(sp_flood, floodX, 0, flood_w, flood_h);
+	
+	// requestAnimationFrame(floodMvmnt);
+	if (gameState === 'playing') console.log(floodX);
 }
 
 function gameLoop() {
@@ -335,6 +372,9 @@ function gameLoop() {
 		if (gameState === 'gameOver') {
 			document.querySelector('h1').textContent = 'GAME OVER';
 			document.getElementById('start-button').textContent = 'TRY AGAIN';
+			document.getElementById('gameover-scores').style.display = 'inline';
+			document.getElementById('hiscore-menu').innerHTML = highScore;
+			document.getElementById('final-score').innerHTML = player.rescues;
 		}
 	}
 }
@@ -347,7 +387,7 @@ window.addEventListener('keydown', e => {
 	if ((e.code === 'KeyS' || e.code === 'ArrowDown') && player.onGround) {
 		if (Math.trunc(player.y + player.h) < PLATFORM_LEVELS[2] ) player.y += 50;
 	}
-	if (e.code === 'Space' && player.onGround) { player.vy = JUMP_FORCE; player.onGround = false;}
+	if ((e.code === 'Space' || e.code === 'KeyW' || e.code === 'ArrowUp') && player.onGround) { player.vy = JUMP_FORCE; player.onGround = false;}
 });
 
 window.addEventListener('keyup', e => {
