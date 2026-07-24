@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flood Rush: Fast Sprint</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link href=".\css\style.css" rel="stylesheet">
+</head>
+<body onload="" class="flex items-center justify-center h-screen">
+
+		<img src="./assets/player_1.png" class="decals left"></img>
+	
+		<img src="./assets/civilian.png" class="decals right"></img>
+	
+  <div id="game-container" class="relative w-full h-full max-w-5xl aspect-[16/9] overflow-hidden shadow-2xl border-4 border-gray-800">
+	<div id="assets">
+		<img id="civ_sp" src="./assets/civilian.png" width="50px"></img>
+		<img id="croc_sp" src="./assets/croc.png" width="83px"></img>
+		<img id="bad_sp" src="./assets/corrupt.png" width="62px"></img>
+		<img id="player_sp" src="./assets/player.png" width="186px"></img>
+		<img id="flood_sp" src="./assets/flood.png" width=3000></img>
+	</div>
+	
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="warning-overlay" class="absolute inset-0 border-[30px] border-red-600 pointer-events-none z-10 flex items-center justify-center">
+        <div class="bg-red-600 text-white px-4 py-2 text-xs uppercase">Flood Imminent!</div>
+    </div>
+
+    <div id="ui-container" class="absolute bg-blue-950 top-0 left-0 w-full p-6 flex justify-between items-start text-white game-ui text-[10px]">
+      <div>
+        <div id="hp-display" class="text-pink-500 mb-1">HP: ❤️❤️❤️</div>
+        <div id="score-display" class="text-yellow-400 font-bold">RESCUES: 0</div>
+        <div id="hiscore-display" class="text-yellow-400 font-bold">HIGH SCORE: <span id="hiscore">0</span></div>
+      </div>
+      <div class="text-right">
+        <div id="flood-display" class="text-cyan-400 italic">FLOOD DISTANCE</div>
+        <div class="mt-2 w-48 h-3 bg-gray-900 rounded-full border-2 border-white overflow-hidden relative">
+            <div id="flood-bar" class="h-full bg-blue-500 transition-all duration-100" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+	
+	<div id="instructions-screen" class="absolute inset-0 bg-blue-950 flex flex-col items-center justify-center text-white text-center p-6 z-50">
+      <h1 class="text-3xl font-bold mb-4 text-blue-500 italic">How to Play</h1>
+      <div class="text-[10px] space-y-4 mb-4 text-gray-300 max-w-md leading-relaxed">
+        <p id="instructions">
+			<button class="bg-zinc-200 text-slate-600 py-.5 px-2.5 rounded-lg text-lg shadow-[3px_3px_0_#62748e]" disabled>A</button>
+			<button class="bg-zinc-200 text-slate-600 py-.5 px-2.5 rounded-lg text-lg shadow-[3px_3px_0_#62748e]" disabled>←</button> : Backward&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+			<button class="bg-zinc-200 text-slate-600 py-.5 px-2.5 rounded-lg text-lg shadow-[3px_3px_0_#62748e]" disabled>D</button>
+			<button class="bg-zinc-200 text-slate-600 py-.5 px-2.5 rounded-lg text-lg shadow-[3px_3px_0_#62748e]" disabled>→</button> : Forward<br><br>
+			<button class="bg-zinc-200 text-slate-600 py-.5 px-2.5 rounded-lg text-lg shadow-[3px_3px_0_#62748e]" disabled>W</button>
+			<button class="bg-zinc-200 text-slate-600 py-.5 px-2.5 rounded-lg text-lg shadow-[3px_3px_0_#62748e]" disabled>↑</button>
+			<button class="bg-zinc-200 text-slate-600 py-.5 px-2.5 rounded-lg text-lg shadow-[3px_3px_0_#62748e]" disabled>Space</button> : Jump&nbsp;&nbsp;&nbsp;
+			<button class="bg-zinc-200 text-slate-600 py-.5 px-2.5 rounded-lg text-lg shadow-[3px_3px_0_#62748e]" disabled>S</button>
+			<button class="bg-zinc-200 text-slate-600 py-.5 px-2.5 rounded-lg text-lg shadow-[3px_3px_0_#62748e]" disabled>↓</button> : Drop
+			<br><br>
+			<img src="./assets/civilian.png" width="30px"><span class="text-green-500">: Rescue!</span>&nbsp;&nbsp;&nbsp;
+			<img src="./assets/croc.png" width="50px"> <img src="./assets/corrupt.png" width="37px"><span class="text-yellow-500">: Avoid!</span><br>
+			<img src="./assets/flood.png" width="75px"><span class="text-red-500">: Don't get caught!</span>
+		</p>
+      </div>
+      <button id="start-button" class="bg-blue-600 hover:bg-blue-500 text-white text-center py-4 px-12 rounded-full text-lg shadow-[0_5px_0_#1e3a8a] active:translate-y-1 transition-all">
+        START SPRINT
+      </button>
+    </div>
+	
+	<div id="menu-screen" class="absolute inset-0 bg-blue-950 flex flex-col items-center justify-center text-white text-center p-6 z-50">
+      <h1 class="text-3xl font-bold mb-4 text-blue-500 italic">Flood Rush: Fast Sprint</h1>
+      <h1 class="text-2xl font-bold mb-4 text-red-500 italic"></h1>
+      <div class="text-[9px] space-y-4 mb-8 text-gray-300 max-w-md leading-relaxed">
+		<div id='gameover-scores' style="display: none; font-size: 1.75em;">
+			<p id="gameover-hi-score" class="text-yellow-400">High Score: <span id="hiscore-menu">-</span>
+			<em><sup id="hi-score-notice" class="text-green-500" style="display: none; font-size: .5em;">NEW HIGH SCORE!</sup></em></p>
+			<p>Your Score: <span id="final-score">-</span></p>
+		<br>
+		</div>
+      </div>
+      <button id="enter-button" class="bg-blue-600 hover:bg-blue-500 py-4 px-12 rounded-full text-lg shadow-[0_5px_0_#1e3a8a] active:translate-y-1 transition-all">
+        PLAY
+      </button>
+    </div>
+  </div>
+  <script src=".\js\game.js"></script>
+</body>
+</html>

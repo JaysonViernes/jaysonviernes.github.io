@@ -1,1 +1,0 @@
-export const sp_flood = document.getElementById("flood_sp");

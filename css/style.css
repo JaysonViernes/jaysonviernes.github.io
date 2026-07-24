@@ -14,23 +14,56 @@ body
 canvas
 {
 	display: block;
-	background-color: #9bdfe4;
-	/* position:absolute; */
-    /* left:0px; */
-    /* top:0px; */
-	/* width: 100%; */
-	/* height: 100%; */
+	background-image: url("../assets/bg.png");
+	background-size: cover;
+	background-blend-mode: overlay;
+	background-color: #9de1e6;
 }
 
 /* UI */
-#bg_sp { opacity: .25; }
+#assets { display: none; margin: auto;}
 
-#assets { display: none; }
+.decals {
+	position: fixed;
+	bottom: 0;
+}
+
+.left {
+	left: 0;
+	height: 37%;
+}
+
+.right {
+	right: 0;
+	height: 45%;
+	margin-right: 10px;
+}
 
 .game-ui
 {
 	text-shadow: 2px 2px 0px #000;
 	pointer-events: none;
+}
+
+#menu-screen {
+	background-image: url("../assets/bg.png");
+	background-size: cover;
+	background-blend-mode: multiply;
+	background-color: #172554;
+}
+
+#instructions {
+	margin :auto;
+	font-size: 1em;
+}
+
+#instructions img {
+	display: inline;
+	margin: 2px;
+}
+
+#instructions button {
+	font-size: 1.1em;
 }
 
 /* FLOOD WARNING */
@@ -50,7 +83,7 @@ canvas
 }
 
 /* POP-UP EVENTS */
-.rescue-pop, .hp-pop
+.rescue-pop, .hp-pop, .dmg-pop
 {
 	position: absolute;
 	font-size: 10px;
@@ -59,7 +92,9 @@ canvas
 	z-index: 20;
 }
 .rescue-pop { color: #fbbf24; }
-.hp-pop { color: #f87171; }
+.hp-pop { color: #22c55e; }
+.dmg-pop { color: #db4444; }
+
 
 @keyframes floatUp
 {

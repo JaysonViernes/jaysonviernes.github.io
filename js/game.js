@@ -1,27 +1,12 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-// const canvas2 = document.getElementById('gameCanvas2');
-// const ctx2 = canvas2.getContext('2d');
 
 // Import Assets
-const sp_bg = document.getElementById("bg_sp");
-const sp_plat1 = document.getElementById("house1_sp");
-const sp_plat2 = document.getElementById("house2_sp");
-const sp_plat3 = document.getElementById("house3_sp");
-const sp_plat4 = document.getElementById("house4_sp");
-const sp_plat5 = document.getElementById("house5_sp");
 const sp_civ = document.getElementById("civ_sp");
 const sp_croc = document.getElementById("croc_sp");
 const sp_bad = document.getElementById("bad_sp");
 const sp_player = document.getElementById("player_sp");
 const sp_flood = document.getElementById("flood_sp");
-
-// Animations
-const croc_anim = {
-	spriteW: 300, totalFrames: 4,
-	frameSrc: 0, currFrame: 0,
-	w: 83, h: 50,
-};
 
 let framesDrawn = 0;
 
@@ -31,13 +16,12 @@ const FRICTION = 0.92;
 const MAX_SPEED = 5; 
 const GRAVITY = 0.25;
 const JUMP_FORCE = -12;
-const PLATFORM_LEVELS = [300, 450, 600]; // tweak these to feel right
+const PLATFORM_LEVELS = [325, 475, 625]; // tweak these to feel right
 
 let gameState = 'start';
 let enableMovement = false;
 let frameCount = 0;
 let worldX = 0;
-let parallaxW = 0; 
 
 // Flood Engine
 var floodX; 
@@ -63,19 +47,18 @@ let platforms = [];
 let entities = []; 
 
 function initGame() {
+	document.getElementById('flood-bar').style.width = `0%`;
 	Object.assign(player, { x: 400, y: 100, vx: 0, vy: 0, hp: 3, rescues: 0, invuln: 0 });
 	worldX = 0; 
-	parallaxW = 0; 
 	floodX = -750; 
 	floodBaseSpeed = 2.5;
-	platforms = [{ x: 0, y: 450, w: 1200, h: 500, angle: 0 }];
+	platforms = [[{}], [{ x: 0, y: 450, w: 1000, h: 475, angle: 0, color: '#805fa8'}], [{}]];
 	entities = [];
 	rescueMilestone = 0;
-	generateLevel(1200);
+	generateLevel(850);
 	gameState = 'playing';
 	gameLoop();
 	animate_player();
-	floodMvmnt();
 	framesDrawn = 0;
 	
 	document.getElementById('hi-score-notice').style.display = 'none';
@@ -88,19 +71,24 @@ function initGame() {
 			highScore = localStorage.getItem("highScore");
 		}
 	}
-	else
-		console.warn("Your browser has no Web storage support, your highscores will not be saved.");
+	else console.warn("Your browser has no Web storage support. Your highscores will not be saved.");
 }
 
-function createPop(toggleHP) {
+function createPop(toggleHP, toggleDmg) {
 	const pop = document.createElement('div');
 	if (toggleHP) {
 		pop.className = 'hp-pop';
 		pop.textContent = '+1 ❤️';
 	}
 	else {
-		pop.className = 'rescue-pop';
-		pop.textContent = '+1 RESCUE';
+		if (toggleDmg) {
+			pop.className = 'dmg-pop';
+			pop.textContent = '-1 💔';
+		}
+		else {
+			pop.className = 'rescue-pop';
+			pop.textContent = '+1 RESCUE';
+		}
 	}
 	pop.style.left = player.x + 'px';
 	pop.style.top = player.y + 'px';
@@ -112,26 +100,56 @@ function generateLevel(startX) {
 	let x = startX;
 
 	for (let i = 0; i < 10; i++) {
-		let gap = 150 + Math.random() * 150;
-		let w = 200 + Math.random() * 300;
-
+		let gap = 200 + Math.random() * 150;
+		let w = 350 + Math.random() * 150;
+		let color;
+		
+		x += gap;
+		
 		// pick one of the 3 fixed heights
 		let y = PLATFORM_LEVELS[Math.floor(Math.random() * PLATFORM_LEVELS.length)];
+		
+		if (y == PLATFORM_LEVELS[0]) color = '#70577c';
+		else if (y == PLATFORM_LEVELS[1]) color = '#3d224a';
+		else color = '#7b5ca2';
 
-		x += gap;
-
-		let platform = { x, y, w, h: 800, angle: 0 }; // no slope now
-		platforms.push(platform);
-
+		let platform = { x, y, w, h: 800, angle: 0, color }; // no slope now
+		
+		switch (y) {
+			case PLATFORM_LEVELS[0]:
+				let platLvl1 = platforms[0];
+				platLvl1.push(platform);
+				platforms.splice(0, 1, platLvl1)
+			break;
+			
+			case PLATFORM_LEVELS[1]:
+				let platLvl2 = platforms[1];
+				platLvl2.push(platform);
+				platforms.splice(1, 1, platLvl2)
+			break;
+			
+			case PLATFORM_LEVELS[2]:
+				let platLvl3 = platforms[2];
+				platLvl3.push(platform);
+				platforms.splice(2, 1, platLvl3)
+			break;
+		}
+		
 		// Entities (same logic, just adjusted to new flat platforms)
 		const rand = Math.random();
 		
+		let entiX = x + (w * 0.35);
+		let entiDistX = entities.length > 0 ? Math.abs((entities[entities.length-1].x) - entiX) : 50;
+		let entiDistY = entities.length > 0 ? entities[entities.length-1].y == y - 50 : false;
+		
+		if (entiDistX < 50 && entiDistY) entiX =+ 275;
+		
 		if (rand > 0.7) {
-			entities.push({ x: x + w/2, y: y - 50, type: 'civ', collected: false, timer: 0 });
+			entities.push({ x: entiX, y: y - 50, type: 'civ', collected: false, timer: 0 });
 		} else if (rand > 0.5) {
-			entities.push({ x: x + w/3, y: y - 30, type: 'croc', active: true });
+			entities.push({ x: entiX, y: y - 30, type: 'croc', active: true });
 		} else if (rand > 0.3) {
-			entities.push({ x: x + (w * 0.7), y: y - 50, type: 'bad', active: true });
+			entities.push({ x: entiX, y: y - 50, type: 'bad', active: true });
 		}
 	}
 }
@@ -142,8 +160,8 @@ function addLives() {
 	if (rescueMilestone >= goal) {
 		player.hp++;
 		rescueMilestone -= goal;
-		console.log("10 more have been rescued! +1HP");
-		setTimeout(() => createPop(true), 100);
+		console.log("25 more have been rescued! +1HP");
+		setTimeout(() => createPop(true, false), 100);
 	}
 }
 
@@ -162,26 +180,28 @@ function update() {
 		if (player.rescues > highScore) {
 			document.getElementById('hi-score-notice').style.display = 'inline';
 			highScore = player.rescues;
-			// document.getElementById('gameover-hi-score').style.color = '#22c55e';
 		}
 	}
 	else highscore = 'Unsupported';
+	
 	addLives();
 	
 	player.onGround = false;
   
-	platforms.forEach(p => {
-		let relX = (player.x + worldX + player.w/2) - p.x;
-		if (relX > 0 && relX < p.w) {
-		  let surfaceY = p.y + (relX * p.angle);
-		  if (player.y + player.h > surfaceY && player.y + player.h < surfaceY + 40) {
-			player.y = surfaceY - player.h; player.vy = 0; player.onGround = true;
-			if (!enableMovement) {
-				enableMovement = player.onGround;
-				keys.down = false;
+	platforms.forEach(level => {
+		level.forEach(p => {
+			let relX = (player.x + worldX + player.w/2) - p.x;
+			if (relX > 0 && relX < p.w) {
+			  let surfaceY = p.y + (relX * p.angle);
+			  if (player.y + player.h > surfaceY && player.y + player.h < surfaceY + 40) {
+				player.y = surfaceY - player.h; player.vy = 0; player.onGround = true;
+				if (!enableMovement) {
+					enableMovement = player.onGround;
+					keys.down = false;
+				}
+			  }
 			}
-		  }
-		}
+		});
 	});
 
 	worldX += player.vx;
@@ -193,17 +213,18 @@ function update() {
 	floodX += (floodBaseSpeed + catchUp);
 
 	entities.forEach(e => {
-	if (e.collected || e.active === false) return;
-	let dist = Math.abs((player.x + worldX) - e.x);
-	let verticalDist = Math.abs(player.y - e.y);
+		if (e.collected || e.active === false) return;
+		let dist = Math.abs((player.x + worldX) - e.x);
+		let verticalDist = Math.abs(player.y - e.y);
 
-	if (dist < 50 && verticalDist < 60) {
-		if (e.type === 'civ') {
-			if (Math.abs(player.vx) < 5.0) {
-				e.timer++;
-				if (e.timer > 10) { player.rescues++; rescueMilestone++; createPop(false); e.collected = true; }
-			} else { e.timer = 0; }
+		if (dist < 50 && verticalDist < 60) {
+			if (e.type === 'civ') {
+				if (Math.abs(player.vx) < 5.0) {
+					e.timer++;
+					if (e.timer > 10) { player.rescues++; rescueMilestone++; createPop(false, false); e.collected = true; }
+				} else { e.timer = 0; }
 			} else if ((e.type === 'croc' || e.type === 'bad') && player.invuln === 0) {
+				createPop(false, true);
 				player.hp--;
 				player.invuln = 120; 
 				player.vx = -12; 
@@ -220,27 +241,22 @@ function update() {
 		keys.down = true;
 		localStorage.setItem("highScore", highScore);
 	}
-
+	
 	document.getElementById('warning-overlay').style.display = (distFromFlood < 400) ? 'flex' : 'none';
-	if (platforms[platforms.length-1].x - worldX < canvas.width * 2) generateLevel(platforms[platforms.length-1].x + 200);
+	if (platforms[1][platforms[1].length-1].x - worldX < canvas.width * 2) generateLevel(platforms[1][platforms[1].length-1].x + 200);
 }
 
 function draw() {
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	ctx.save();
 	ctx.translate(-worldX, 0);
-	
-	parallax();
-	
-	platforms.forEach(p => {  
-		ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
-		ctx.fillStyle = '#1a1a1a99'; ctx.fillRect(0, 0, p.w, 800);
-		ctx.fillStyle = '#334155'; ctx.fillRect(0, 0, p.w, 6);
 		
-		if (p.y == PLATFORM_LEVELS[1]) platforms.zIndex = 2;
-		else if (p.y == PLATFORM_LEVELS[2]) platforms.zIndex = 3;
-		
-		ctx.restore();
+	platforms.forEach(level => {  
+		level.forEach(p => {
+			ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
+			ctx.fillStyle = p.color; ctx.fillRect(0, 0, p.w, 800);
+			ctx.restore();
+		});
 	});
 	
 	entities.forEach(e => {
@@ -252,70 +268,38 @@ function draw() {
 		
 		switch (e.type) {
 			case "civ":
-				ctx.drawImage(sp_civ, e.x - 15, e.y - 23, 50, 73);
+				ctx.drawImage(sp_civ, e.x, e.y - 23, 50, 73);
 				break;
 			
 			case "croc":
-				// animate_croc(e); // WARNING: Dramatically drops performance on spawn
-				ctx.drawImage(
-					sp_croc,
-					e.x - 15, e.y - 20,
-					croc_anim.w, croc_anim.h
-				);
+				ctx.drawImage(sp_croc, e.x, e.y - 20, 83, 50);
 				break;
 			
 			case "bad":
-				ctx.drawImage(sp_bad, e.x - 15, e.y - 21, 63, 72);
+				ctx.drawImage(sp_bad, e.x, e.y - 21, 63, 72);
 				break;
 		}
 		
 		if (e.type === 'civ' && e.timer > 0) {
-			ctx.fillStyle = '#14283d'; ctx.fillRect(e.x - 20, e.y - 50, 60, 10);
-			ctx.fillStyle = '#fbbf24'; ctx.fillRect(e.x - 20, e.y - 50, (e.timer/10)*60, 10);
+			ctx.fillStyle = '#14283d'; ctx.fillRect(e.x, e.y - 50, 60, 10);
+			ctx.fillStyle = '#fbbf24'; ctx.fillRect(e.x, e.y - 50, (e.timer/10)*60, 10);
 		}
 	});
 	
-	/* Old Wave */
-	let grad = ctx.createLinearGradient(floodX - 400, 0, floodX, 0);
-	grad.addColorStop(0, '#ff0000'); grad.addColorStop(1, '#ff0000');
-	ctx.fillStyle = grad; ctx.fillRect(floodX - 3000, 0, 3000, canvas.height);
-	ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.beginPath();
-	ctx.moveTo(floodX, 0);
-	for(let i=0; i<canvas.height; i+=25) ctx.lineTo(floodX + Math.sin((frameCount+i)*0.1)*10, i);
-	ctx.stroke();
-		
+	floodMvmnt();
 	ctx.restore();
 	
-	if (!(player.invuln % 4 > 2)) {
-		// ctx.fillStyle = '#3b82f6';
-		// ctx.fillRect(player.x, player.y, player.w, player.h);
-		// ctx.strokeStyle = 'white'; ctx.strokeRect(player.x, player.y, player.w, player.h);
-		// if (!isPlayerDrawn) animate_player();
-	}
-
 	document.getElementById('hp-display').textContent = 'HP: ' + '❤️'.repeat(player.hp);
 	document.getElementById('score-display').textContent = 'RESCUES: ' + player.rescues;
 	document.getElementById('hiscore').textContent = highScore;
-	// document.getElementById('dist-display').textContent = `${Math.max(0, Math.floor(distanceToGoal))}m TO SAFETY`;
-	let prox = Math.min(100, (1 - ((player.x + worldX) - floodX) / 800) * 100);
-	document.getElementById('flood-bar').style.width = Math.max(0, prox) + '%';
-}
-
-function parallax() {
-	if (gameState != "playing") {
-		ctx.clearRect(0, 0, canvas.width, canvas.height);
-		return;
+	
+	if (gameState == "playing") {
+		let prox = 100 - (((player.x + worldX) - floodX) / 6);
+		if (prox < 0) prox = 0;
+		document.getElementById('flood-bar').style.width = `${prox}%`;
 	}
+	else document.getElementById('flood-bar').style.width = `0%`;
 		
-	parallaxW += player.vx;
-	if (parallaxW > sp_bg.naturalWidth) parallaxW = 0;
-	
-	ctx.drawImage(sp_bg, parallaxW, 0, canvas.width, sp_bg.naturalHeight, worldX, 0, canvas.width, canvas.height);
-	
-	// if (parallaxW == sp_bg.naturalWidth / 2) tile2 = ctx.drawImage(sp_bg, parallaxW + canvas.width, 0, (2 * canvas.width), sp_bg.naturalHeight, worldX, 0, canvas.width, canvas.height);
-	
-	console.log(`player.vx = ${player.vx}`);
-	console.log(`worldX = ${worldX}`);
 }
 
 function animate_player() {
@@ -339,28 +323,11 @@ function animate_player() {
 	}
 }
 
-// function animate_croc(e) {
-	// requestAnimationFrame(animate_croc);
-				
-	// croc_anim.currFrame = croc_anim.currFrame % croc_anim.totalFrames;
-	// croc_anim.frameSrc = croc_anim.currFrame * croc_anim.w
-	// ctx.drawImage(
-		// sp_croc, croc_anim.frameSrc, 0,
-		// croc_anim.w, croc_anim.h,
-		// e.x - 15, e.y - 15,
-		// croc_anim.w, croc_anim.h
-	// );
-	
-	// if (framesDrawn >= 8) croc_anim.currFrame++;
-// }
-
 function floodMvmnt() {
-	let flood_w = ctx.height * (867 / 1058);
-	let flood_h = ctx.height;
-	ctx.drawImage(sp_flood, floodX, 0, flood_w, flood_h);
-	
-	// requestAnimationFrame(floodMvmnt);
-	if (gameState === 'playing') console.log(floodX);
+	let flood_w = canvas.height * (1580 / 1058);
+	let flood_h = canvas.height;
+		
+	ctx.drawImage(sp_flood, floodX - (flood_w * .7), flood_h - canvas.height, flood_w, flood_h);
 }
 
 function gameLoop() {
@@ -369,9 +336,10 @@ function gameLoop() {
 	if (gameState === 'playing') { update(); draw(); requestAnimationFrame(gameLoop); }
 	else if (gameState !== 'start') { 
 		document.getElementById('menu-screen').style.display = 'flex'; 
+		document.getElementById('instructions-screen').style.display = 'flex'; 
 		if (gameState === 'gameOver') {
-			document.querySelector('h1').textContent = 'GAME OVER';
-			document.getElementById('start-button').textContent = 'TRY AGAIN';
+			document.getElementById('menu-screen').children[1].textContent = 'GAME OVER';
+			document.getElementById('enter-button').textContent = 'TRY AGAIN';
 			document.getElementById('gameover-scores').style.display = 'inline';
 			document.getElementById('hiscore-menu').innerHTML = highScore;
 			document.getElementById('final-score').innerHTML = player.rescues;
@@ -397,8 +365,12 @@ window.addEventListener('keyup', e => {
 	if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = false;
 });
 
-document.getElementById('start-button').addEventListener('click', () => { 
+document.getElementById('enter-button').addEventListener('click', () => { 
 	document.getElementById('menu-screen').style.display = 'none'; 
+});
+
+document.getElementById('start-button').addEventListener('click', () => { 
+	document.getElementById('instructions-screen').style.display = 'none'; 
 	document.getElementById('start-button').style.display = 'inline-block'; 
 	initGame(); 
 });
